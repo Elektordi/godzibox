@@ -496,15 +496,16 @@ sub getServer
 {
 	my ($address, $port) = @_;
 
+	#Elek: Query updated for adminbot db
 	my $query = "
 		SELECT
-			serverId,
-			game
+			ServerId,
+			GameId
 		FROM
-			hlstats_Servers
+			GameServer
 		WHERE
-			address='$address' AND
-			port='$port'
+			ServerAddress='$address' AND
+			ServerPort='$port'
 	";
 	my $result = &doQuery($query);
 
@@ -513,7 +514,7 @@ sub getServer
 		my ($serverId, $game) = $result->fetchrow_array;
 		$result->finish;
 
-		return new HLstats_Server($serverId, $address, $port, $game);
+		return new GodziBox_Server($serverId, $address, $port, $game);
 	}
 	else
 	{
@@ -656,7 +657,7 @@ sub getPlayerInfo
 			{
 				# Add the player to our hash of player objects
 				
-				$g_players{"$s_addr/$userid"} = new HLstats_Player(
+				$g_players{"$s_addr/$userid"} = new GodziBox_Player(
 					server => $s_addr,
 					userid => $userid,
 					uniqueid => $uniqueid,
@@ -675,7 +676,7 @@ sub getPlayerInfo
 					$g_lan_noplayerinfo_hack->{"$userid"}->{"name"} eq $name &&
 					$g_lan_noplayerinfo_hack->{"$userid"}->{"server"} eq $s_addr)
 			{
-				$g_players{"$s_addr/$userid"} = new HLstats_Player(
+				$g_players{"$s_addr/$userid"} = new GodziBox_Player(
 					server => $s_addr,
 					userid => $userid,
 					uniqueid => $g_lan_noplayerinfo_hack->{"$userid"}->{"ipaddress"},
@@ -836,7 +837,7 @@ a MySQL database for tournament coordination.
       --nostdin                   disables above
       --server-ip                 specify data source IP address for --stdin
       --server-port               specify data source port for --stdin  [$g_server_port]
-  -t, --timestamp                 tells HLstats to use the timestamp in the log
+  -t, --timestamp                 tells GodziBox to use the timestamp in the log
                                     data, instead of the current time on the
                                     database server, when recording events
       --notimestamp               disables above
@@ -966,7 +967,7 @@ if ($g_stdin)
 	if (!$g_server_ip || !$g_server_port)
 	{
 		print "-> ERROR: Must specify source of STDIN data using --server-ip and --server-port\n";
-		print "-> Example: ./hlstats.pl --stdin --server-ip 12.34.56.78 --server-port 27015\n\n";
+		print "-> Example: ./godzibox --stdin --server-ip 12.34.56.78 --server-port 27015\n\n";
 		exit(255);
 	}
 	else
@@ -1052,7 +1053,7 @@ while ( ($row) = $result->fetchrow_array )
 }
 $result->finish;
 
-print "\n++ HLstats is now running ($g_mode mode";
+print "\n++ GodziBox is now running ($g_mode mode";
 if ($g_debug > 0) { print ", debug level $g_debug"; }
 print ").\n\n";
 

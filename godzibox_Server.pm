@@ -1,4 +1,10 @@
-package HLstats_Server;
+package GodziBox_Server;
+#####################################################
+# GodziBox - Tournament servers coordination system
+# Copyright (C) 2007 Association Godzilan
+# http://www.godzilan.net/
+# Elektordi & JBG - Oct. 2007
+#####################################################
 #
 # HLstats_Server.pm - HLstats Server class
 # http://sourceforge.net/projects/hlstats/

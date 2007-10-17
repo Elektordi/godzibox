@@ -1,6 +1,12 @@
+#####################################################
+# GodziBox - Tournament servers coordination system
+# Copyright (C) 2007 Association Godzilan
+# http://www.godzilan.net/
+# Elektordi & JBG - Oct. 2007
+#####################################################
+# godzibox.plib - Library of common functions for all GodziBox Perl scripts
 #
-# HLstats.plib - Library of common functions for all HLstats Perl scripts
-# http://sourceforge.net/projects/hlstats/
+# Based on: HLstats.plib - http://sourceforge.net/projects/hlstats/
 #
 # Copyright (C) 2001  Simon Garner
 #
@@ -22,7 +28,7 @@
 
 # HLstats release version number
 
-$VERSION = "1.35";
+$VERSION = "0.1";
 $g_version = $VERSION;
 
 %PATTERNS = ();
