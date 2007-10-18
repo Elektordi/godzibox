@@ -32,6 +32,7 @@
 
 sub doEvent_Connect
 {	
+return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId, $ipAddr) = @_;
 	
 	my $desc;
@@ -80,6 +81,7 @@ sub doEvent_Connect
 
 sub doEvent_EnterGame
 {
+return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId) = @_;
 	
 	my $desc;
@@ -108,6 +110,7 @@ sub doEvent_EnterGame
 
 sub doEvent_Disconnect
 {
+return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId) = @_;
 	
 	my $desc;
@@ -139,6 +142,8 @@ sub doEvent_Disconnect
 
 sub doEvent_Suicide
 {	
+	return "Useless Event !";
+
 	my ($playerId, $weapon) = @_;
 	
 	my $desc;
@@ -173,6 +178,7 @@ sub doEvent_Suicide
 
 sub doEvent_TeamSelection
 {
+return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId, $team) = @_;
 	
 	my $desc;
@@ -204,6 +210,7 @@ sub doEvent_TeamSelection
 
 sub doEvent_RoleSelection
 {
+return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId, $role) = @_;
 	
 	my $desc;
@@ -235,6 +242,8 @@ sub doEvent_RoleSelection
 
 sub doEvent_ChangeName
 {
+	return "Useless Event !";
+	
 	my ($playerId, $newname) = @_;
 	
 	my $desc;
@@ -285,6 +294,8 @@ sub doEvent_ChangeName
 
 sub doEvent_Frag
 {
+	return "Useless Event !";
+	
 	my ($killerId, $victimId, $weapon) = @_;
 	
 	my $desc;
@@ -359,6 +370,8 @@ sub doEvent_Frag
 
 sub doEvent_PlayerPlayerAction
 {
+	return "Useless Event !";
+	
 	my ($playerId, $victimId, $action) = @_;
 	
 	my $desc;
@@ -436,6 +449,8 @@ sub doEvent_PlayerPlayerAction
 
 sub doEvent_PlayerAction
 {
+	return "Useless Event !";
+	
 	my ($playerId, $action) = @_;
 	
 	my $desc;
@@ -510,6 +525,8 @@ sub doEvent_PlayerAction
 
 sub doEvent_TeamAction
 {
+	return "Useless Event !";
+	
 	my ($team, $action) = @_;
 	
 	my $desc;
@@ -567,6 +584,8 @@ sub doEvent_TeamAction
 
 sub doEvent_WorldAction
 {
+	return "Useless Event !"; # Provisoire, sert réellement !
+	
 	my ($action) = @_;
 	
 	my $desc;
@@ -624,6 +643,7 @@ sub doEvent_WorldAction
 
 sub doEvent_Chat
 {
+return "Useless Event !"; # Provisoire, sert réellement !
 	my ($type, $playerId, $message) = @_;
 	
 	my $player = $g_players{"$s_addr/$playerId"};
@@ -800,6 +820,8 @@ sub doEvent_ChangeMap
 
 sub doEvent_Rcon
 {
+	return "Useless Event !";
+	
 	my ($type, $command, $password, $remoteAddr) = @_;
 	
 	my $ipAddr;
@@ -848,6 +870,8 @@ sub doEvent_ServerName
 
 sub doEvent_Admin
 {
+	return "Useless Event !";
+	
 	my ($type, $message, $playerName) = @_;
 	
 	&recordEvent(
@@ -866,6 +890,7 @@ sub doEvent_Admin
 
 sub doEvent_Statsme
 {
+	return "Useless Event !";
         my ($playerId, $weapon, $shots, $hits, $headshots, $damage, $kills, $deaths) = @_;
 
         my $desc;
@@ -900,6 +925,7 @@ sub doEvent_Statsme
 
 sub doEvent_Statsme2
 {
+	return "Useless Event !";
         my ($playerId, $weapon, $head, $chest, $stomach, $leftarm, $rightarm, $leftleg, $rightleg) = @_;
 
         my $desc;
@@ -935,6 +961,7 @@ sub doEvent_Statsme2
 
 sub doEvent_Statsme_Latency
 {
+	return "Useless Event !";
         my ($playerId, $ping) = @_;
 
         my $desc;
@@ -963,6 +990,10 @@ sub doEvent_Statsme_Latency
 
 sub doEvent_Statsme_Time
 {
+
+		return "Useless Event !";
+		
+		
         my ($playerId, $time) = @_;
 
         my $desc;

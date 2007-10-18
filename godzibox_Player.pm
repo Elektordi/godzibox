@@ -64,9 +64,6 @@ sub new
 	die("HLstats_Player->new(): must specify player's name\n")
 		unless ($params{name} ne "");
 	
-	$self->setUniqueId($params{uniqueid});
-	$self->setName($params{name});
-	
 	while (my($key, $value) = each(%params))
 	{
 		if ($key ne "name" && $key ne "uniqueid")
@@ -76,8 +73,6 @@ sub new
 	}
 	
 	&::printNotice("Created new player object " . $self->getInfoString());
-	
-	$self->updateDB();
 	
 	return $self;
 }
@@ -107,19 +102,8 @@ sub set
 			return 0;
 		}
 		
-		if ($key eq "uniqueid")
-		{
-			return $self->setUniqueId($value);
-		}
-		elsif ($key eq "name")
-		{
-			return $self->setName($value);
-		}
-		else
-		{
-			$self->{$key} = $value;
-			return 1;
-		}
+		$self->{$key} = $value;
+		return 1;
 	}
 	else
 	{
@@ -161,255 +145,6 @@ sub get
 	{
 		warn("HLstats_Player->get: \"$key\" is not a valid property name\n");
 	}
-}
-
-
-#
-# Set player's uniqueid
-#
-
-sub setUniqueId
-{
-	my ($self, $uniqueid) = @_;
-	
-	my $playerid = &::getPlayerId($uniqueid);
-	
-	if ($playerid)
-	{
-		# An existing player. Get their skill rating.
-		
-		my $query = "
-			SELECT
-				skill
-			FROM
-				hlstats_Players
-			WHERE
-				playerId='$playerid'
-		";
-		my $result = &::doQuery($query);
-		($self->{skill}) = $result->fetchrow_array;
-		$result->finish;
-	}
-	else
-	{
-		# This is a new player. Create a new record for them in the Players
-		# table.
-		
-		my $query = "
-			INSERT INTO
-				hlstats_Players
-				(
-					lastName,
-					clan,
-					game
-				)
-			VALUES
-			(
-				'" . &::quoteSQL($self->get("name")) . "',
-				'" . $self->get("clan") . "',
-				'" . $::g_servers{$::s_addr}->{game} . "'
-			)
-		";
-		my $result = &::doQuery($query);
-		$result->finish;
-		
-		$result = &::doQuery("SELECT LAST_INSERT_ID()");
-		($playerid) = $result->fetchrow_array;
-		$result->finish;
-		
-		if ($playerid)
-		{
-			$query = "
-				INSERT INTO
-					hlstats_PlayerUniqueIds
-					(
-						playerId,
-						uniqueId,
-						game
-					)
-				VALUES
-				(
-					'" . $playerid . "',
-					'" . &::quoteSQL($uniqueid) . "',
-					'" . $::g_servers{$::s_addr}->{game} . "'
-				)
-			";
-			$result = &::doQuery($query);
-			$result->finish;
-		}
-		else
-		{
-			error("Unable to create player:\n$query");
-		}
-	}
-	
-	$self->{uniqueid} = $uniqueid;
-	$self->{playerid} = $playerid;
-	
-	return 1;
-}
-
-
-
-#
-# Set player's name
-#
-
-sub setName
-{
-	my ($self, $name) = @_;
-	
-	my $oldname = $self->get("name");
-
-	if ($oldname eq $name)
-	{
-		return 2;
-	}
-	
-	if ($oldname)
-	{
-		$self->updateDB();
-	}
-	
-	$self->{name} = $name;
-	$self->{clan} = &::getClanId($name);
-	
-	my $playerid = $self->get("playerid");
-	
-	if ($playerid)
-	{
-		my $query = "
-			SELECT
-				playerId
-			FROM
-				hlstats_PlayerNames
-			WHERE
-				playerId='" . $playerid . "'
-				AND name='" . &::quoteSQL($self->get("name")) . "'
-		";
-		my $result = &::doQuery($query);
-		
-		if ($result->rows < 1)
-		{
-			$query = "
-				INSERT INTO
-					hlstats_PlayerNames
-					(
-						playerId,
-						name,
-						lastuse,
-						numuses
-					)
-				VALUES
-				(
-					'" . $playerid . "',
-					'" . &::quoteSQL($self->get("name")) . "',
-					" . $::ev_datetime . ",
-					1
-				)
-			";
-			&::doQuery($query);
-		}
-		else
-		{
-			$query = "
-				UPDATE
-					hlstats_PlayerNames
-				SET
-					lastuse=" . $::ev_datetime . ",
-					numuses=numuses+1
-				WHERE
-					playerId='" . $playerid . "'
-					AND name='" . &::quoteSQL($self->get("name")) . "'
-			";
-			&::doQuery($query);
-		}
-		
-		$result->finish;
-	}
-	else
-	{
-		&::error("HLstats_Player->setName(): No playerid");
-	}
-}
-
-
-
-#
-# Update player information in database
-#
-
-sub updateDB
-{
-	my ($self, $leaveLastUse, $callref) = @_;
-	
-	my $playerid = $self->get("playerid");
-	my $name = $self->get("name");
-	my $clan = $self->get("clan");
-	my $kills  = $self->get("kills");
-	my $deaths = $self->get("deaths");
-	my $suicides = $self->get("suicides");
-	my $skill  = $self->get("skill");
-	
-	unless ($playerid)
-	{
-		warn ("Player->Update() with no playerid set!\n");
-		return 0;
-	}
-	
-	# Update player details
-	my $query = "
-		UPDATE
-			hlstats_Players
-		SET
-			lastName='" . &::quoteSQL($name) . "',
-			clan='$clan',
-			kills=kills + $kills,
-			deaths=deaths + $deaths,
-			suicides=suicides + $suicides,
-			skill=$skill
-		WHERE
-			playerId='$playerid'
-	";
-	&::doQuery($query, "Player->updateDB(): $callref");
-	
-	if ($name)
-	{
-		# Update alias details
-		$query = "
-			UPDATE
-				hlstats_PlayerNames
-			SET
-				kills=kills + $kills,
-				deaths=deaths + $deaths,
-				suicides=suicides + $suicides"
-		;
-		
-		unless ($leaveLastUse)
-		{
-			# except on ChangeName we update the last use on a player's old name
-			
-			$query .= ",
-				lastuse=" . $::ev_datetime . ""
-			;
-		}
-		
-		$query .= "
-			WHERE
-				playerId='" . $playerid . "'
-				AND name='" . &::quoteSQL($self->get("name")) . "'
-		";
-		&::doQuery($query);
-	}
-	
-	# reset player stat properties
-	$self->set("kills", 0);
-	$self->set("deaths", 0);
-	$self->set("suicides", 0);
-	
-	&::printNotice("Updated player object " . $self->getInfoString());
-	
-	return 1;
 }
 
 

@@ -283,6 +283,22 @@ sub doConf
 
 
 #
+# string say (string message[, string server_ip[, string server_port]])
+#
+# Say the given message via rcon.
+#
+
+sub say
+{
+	my ($message, $server_ip, $server_port) = @_;
+	
+	$server_ip   = $s_peerhost  unless ($server_ip);
+	$server_port = $s_peerport  unless ($server_port);
+	
+	return &rcon("say $message", $server_ip, $server_port);
+}
+
+#
 # string rcon (string command[, string server_ip[, string server_port]])
 #
 # Executes the given command via Rcon.
