@@ -796,6 +796,7 @@ else
 	print "-- Opening UDP listen socket on $ip$s_port ... ";
 	
 	$s_socket = IO::Socket::INET->new(
+		Blocking=>0,
 		Proto=>"udp",
 		LocalAddr=>"$s_ip",
 		LocalPort=>"$s_port"
