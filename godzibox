@@ -862,6 +862,14 @@ while ($loop = &getLine())
 		$s_peerport = $s_socket->peerport;
 	}
 	
+	if(!$s_peerhost)
+	{
+		# Return to recv if we don't have data !
+		next;
+	}
+	
+	print "$s_output\n";
+	
 	$s_addr = "$s_peerhost:$s_peerport";
 	
 	$s_output =~ s/[\r\n\0]//g;	# remove naughty characters
