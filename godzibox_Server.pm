@@ -6,7 +6,7 @@ package GodziBox_Server;
 # Elektordi & JBG - Oct. 2007
 #####################################################
 #
-# HLstats_Server.pm - HLstats Server class
+# Based on HLstats_Server.pm - HLstats Server class
 # http://sourceforge.net/projects/hlstats/
 #
 # Copyright (C) 2001  Simon Garner
@@ -42,6 +42,7 @@ sub new
 	
 	$self->{map}     = "";
 	$self->{numplayers} = 0;
+	$self->{lastlog} = 0;
 
 	$self->{t1name} = "";
 	$self->{t2name} = "";
@@ -68,6 +69,37 @@ sub new
 	$self->{randomsides} = 0; # T1 will not always start as CT
 
 	return $self;
+}
+
+sub say
+{
+	my ($self, $message) = @_;
+	&say($message, $self->{address}, $self->{port});
+}
+
+sub rcon2
+{
+	my ($self, $command) = @_;
+::printNotice("send to $self->{address}, $self->{port}: $command\n");
+	::rcon($command, $self->{address}, $self->{port});
+}
+
+sub think
+{
+	return 1;
+}
+
+sub ping
+{
+	my ($self) = @_;
+	$self->{lastlog} = time();
+}
+
+sub logattach
+{
+	my ($self) = @_;
+	$self->rcon2("logaddress $s_ip $s_port");
+	$self->rcon2("log on");
 }
 
 1;

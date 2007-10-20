@@ -6,7 +6,7 @@ package GodziBox_Player;
 # Elektordi & JBG - Oct. 2007
 #####################################################
 #
-# HLstats_Player.pm - HLstats Player class
+# Based on HLstats_Player.pm - HLstats Player class
 # http://sourceforge.net/projects/hlstats/
 #
 # Copyright (C) 2001  Simon Garner

@@ -309,24 +309,31 @@ sub getClanId
 
 sub getServer
 {
+
 	my ($address, $port) = @_;
+
+	
 
 	#Elek: Query updated for adminbot db
 	my $query = "
 		SELECT
 			ServerId,
-			GameId
+			GameId,
+			ServerAddress,
+			ServerPort
 		FROM
 			GameServer
 		WHERE
-			ServerAddress='$address' AND
+			ServerAddress='$address'
+				AND
 			ServerPort='$port'
-	";
+		";
+
 	my $result = &doQuery($query);
 
 	if ($result->rows)
 	{
-		my ($serverId, $game) = $result->fetchrow_array;
+		my ($serverId, $game, $address, $port) = $result->fetchrow_array;
 		$result->finish;
 
 		return new GodziBox_Server($serverId, $address, $port, $game);
@@ -835,7 +842,11 @@ print ").\n\n";
 
 # Main data loop
 
-$c = 0;
+$lastoptimise = 0; # Database optimise
+$lastsrvthink = 0; # Last servers pool
+$lastchecknew = 0; # Check for news
+
+$now = 0;
 
 sub getLine
 {
@@ -861,6 +872,92 @@ while ($loop = &getLine())
 		$s_peerhost = $s_socket->peerhost;
 		$s_peerport = $s_socket->peerport;
 	}
+
+	$now = time();
+
+	# Look for new/dead servers every 15s
+	if ($lastchecknew + 15 < $now)
+	{
+		$lastchecknew = $now;
+                if ($g_debug > 0)
+                {
+                        print "\n-- Looking for new servers...\n";
+		}
+
+		$result = &doQuery("SELECT ServerAddress, ServerPort FROM GameServer");
+		while ( ($s_host, $s_port) = $result->fetchrow_array )
+		{
+			$s_addr = $s_host . ":" . $s_port;
+			if (!$g_servers{$s_addr})
+			{
+				# Add server
+				$g_servers{$s_addr} = &getServer($s_host, $s_port);
+				if (!$g_servers{$s_addr})
+	                        {
+					&printEvent(997, "UNRECOGNISED SERVER ENTRY: " . $s_addr);
+					next;
+				}
+		                if ($g_debug > 0)
+		                {
+		                        print "-> Found $s_addr !\n";
+		                }
+
+				$g_servers{$s_addr}->logattach();
+			}
+			else
+			{
+				# No log from server in last 5mins. Retry !
+			}
+		}
+		$result->finish;
+
+	}
+
+	# Pool active servers every 1s
+        if ($lastsrvthink + 1 < $now)
+        {
+                $lastsrvthink = $now;
+		foreach $server (@g_servers)
+		{
+			$server->think();
+		}
+
+        }
+
+        # Optimise database over every 15min
+
+        if ($lastoptimise + 900 < $now)
+        {
+		$lastoptimise = $now;
+
+                if ($g_debug > 0)
+                {
+                        print "\n-- Optimizing database: Optimizing tables...\n";
+                }
+
+                foreach $table (@g_allTables)
+                {
+                        if ($g_debug > 0)
+                        {
+                                print "-> $table ... "
+                        }
+
+                        &doQuery("
+                                OPTIMIZE TABLE $table
+                        ");
+
+                        if ($g_debug > 0)
+                        {
+                                print "OK\n";
+                        }
+                }
+
+                if ($g_debug > 0)
+                {
+                        print "-- Database optimization complete.\n\n";
+                }
+        }
+
 	
 	if(!$s_peerhost)
 	{
@@ -880,13 +977,13 @@ while ($loop = &getLine())
 	if (!$g_servers{$s_addr})
 	{
 		$g_servers{$s_addr} = &getServer($s_peerhost, $s_peerport);
-		
 		if (!$g_servers{$s_addr})
 		{
 			&printEvent(997, "UNRECOGNISED SERVER: " . $s_output);
 			next;
 		}
 	}
+	$g_servers{$s_addr}->ping();
 	
 	# Get the datestamp (or complain)
 	if ($s_output =~ s/^.*L (\d\d)\/(\d\d)\/(\d{4}) - (\d\d):(\d\d):(\d\d):\s*//)
@@ -1671,37 +1768,4 @@ EOT
 		}
 	}
 	
-	# Optimise database over at every 500000th iteration of the main loop
-
-	if ($c % 500000 == 0)
-	{
-		if ($g_debug > 0)
-		{
-			print "\n-- Optimizing database: Optimizing tables...\n";
-		}
-		
-		foreach $table (@g_allTables)
-		{
-			if ($g_debug > 0)
-			{
-				print "-> $table ... "
-			}
-			
-			&doQuery("
-				OPTIMIZE TABLE $table
-			");
-			
-			if ($g_debug > 0)
-			{
-				print "OK\n";
-			}
-		}
-		
-		if ($g_debug > 0)
-		{
-			print "-- Database optimization complete.\n\n";
-		}		
-	}
-	$c++;
-	$c = 1 if ($c > 500000);
 }
