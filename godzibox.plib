@@ -316,16 +316,14 @@ sub rcon
 	
 	my $result = &doQuery("
 		SELECT
-			hlstats_Servers.rcon_password,
-			hlstats_Games.source AS source
+			ServerRcon,
+			ServerType
 		FROM
-			hlstats_Servers
-		LEFT JOIN hlstats_Games ON
-			hlstats_Games.code = hlstats_Servers.game
+			GameServer
 		WHERE
-			hlstats_Servers.address='$server_ip'
+			ServerAddress='$server_ip'
 		AND
-			hlstats_Servers.port='$server_port'
+			ServerPort='$server_port'
 	");
 	my ($password, $source) = $result->fetchrow_array();
 	$result->finish;

@@ -42,7 +42,31 @@ sub new
 	
 	$self->{map}     = "";
 	$self->{numplayers} = 0;
+
+	$self->{t1name} = "";
+	$self->{t2name} = "";
+
+	$self->{t1ready} = 0;
+	$self->{t2ready} = 0;
+
+	$self->{t1score} = 0;
+	$self->{t2score} = 0;
 	
+	$self->{lastsay} = 0;
+	$self->{idmatch} = 0;
+	$self->{turn} = 0;
+	$self->{inmatch} = 0;
+	$self->{round} = 0;
+	$self->{password} = "";
+	$self->{matchmap} = "";
+	$self->{rules} = "";
+
+	$self->{maxrounds} = 0;
+	$self->{allowtie} = 0;
+	$self->{breakpoint} = 0; # Stop match if score > maxrounds +1
+	$self->{kickonmapload} = 0; # Kick on map load
+	$self->{randomsides} = 0; # T1 will not always start as CT
+
 	return $self;
 }
 
