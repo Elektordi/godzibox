@@ -320,7 +320,8 @@ sub getServer
 			ServerId,
 			GameId,
 			ServerAddress,
-			ServerPort
+			ServerPort,
+			ServerHostName
 		FROM
 			GameServer
 		WHERE
@@ -333,10 +334,10 @@ sub getServer
 
 	if ($result->rows)
 	{
-		my ($serverId, $game, $address, $port) = $result->fetchrow_array;
+		my ($serverId, $game, $address, $port, $name) = $result->fetchrow_array;
 		$result->finish;
 
-		return new GodziBox_Server($serverId, $address, $port, $game);
+		return new GodziBox_Server($serverId, $address, $port, $game, $name);
 	}
 	else
 	{
@@ -416,7 +417,6 @@ sub getPlayerInfo
 		# Don't connect Mr. Console or HLTV, they should not be recorded as players!
 		return 0 if ($uniqueid eq "Console");
 		return 0 if ($uniqueid eq "HLTV");
-		
 		if ($forced_uniqueid)
 		{
 			$uniqueid = $forced_uniqueid;
@@ -462,6 +462,8 @@ sub getPlayerInfo
 		{
 			$haveplayer = 0;
 		}
+
+		#print("P=$player, Name=$name, USID=$userid, UNID=$uniqueid, T=$team, FID=$forced_uniqueid, HP=$haveplayer\n"); # Hack elek
 		
 		if ($haveplayer &&
 			$g_players{"$s_addr/$userid"}->get("uniqueid") eq $uniqueid)
@@ -597,8 +599,8 @@ $db_pass = "";
 $db_name = "godzibox";
 $db_lowpriority = 1;
 
-$s_ip = "";
-$s_port = "27500";
+$g_ip = "127.0.0.1";
+$g_port = "27500";
 
 $g_mailto = "";
 $g_mailpath = "/bin/mail";
@@ -689,8 +691,8 @@ if ($opt_configfile && -r $opt_configfile)
 		"DBPassword",		"db_pass",
 		"DBName",			"db_name",
 		"DBLowPriority",	"db_lowpriority",
-		"BindIP",			"s_ip",
-		"Port",				"s_port",
+		"BindIP",			"g_ip",
+		"Port",				"g_port",
 		"MailTo",			"g_mailto",
 		"MailPath",			"g_mailpath",
 		"Mode",				"g_mode",
@@ -725,8 +727,8 @@ GetOptions(
 	"db-username=s"		=> \$db_user,
 	"dns-resolveip!"	=> \$g_dns_resolveip,
 	"dns-timeout=i"		=> \$g_dns_timeout,
-	"ip|i=s"			=> \$s_ip,
-	"port|p=i"			=> \$s_port,
+	"ip|i=s"			=> \$g_ip,
+	"port|p=i"			=> \$g_port,
 	"rcon!"				=> \$g_rcon,
 	"r"					=> \$g_rcon,
 	"stdin!"			=> \$g_stdin,
@@ -772,6 +774,10 @@ if ($g_mode ne "Normal" && $g_mode ne "LAN" && $g_mode ne "NameTrack")
 $g_debug -= $g_nodebug;
 $g_debug = 0 if ($g_debug < 0);
 
+if ($g_ip eq "")
+{
+	$g_ip = "127.0.0.1";
+}
 
 # Startup
 
@@ -799,15 +805,15 @@ if ($g_stdin)
 }
 else
 {
-	if ($s_ip) { $ip = $s_ip . ":"; } else { $ip = "port "; }
-	print "-- Opening UDP listen socket on $ip$s_port ... ";
+	if ($g_ip) { $ip = $g_ip . ":"; } else { $ip = "port "; }
+	print "-- Opening UDP listen socket on $ip$g_port ... ";
 	
 	$s_socket = IO::Socket::INET->new(
 		Blocking=>0,
 		Proto=>"udp",
-		LocalAddr=>"$s_ip",
-		LocalPort=>"$s_port"
-	) or die ("\nCan't setup UDP socket on $ip$s_port: $!\n");
+		LocalAddr=>"$g_ip",
+		LocalPort=>"$g_port"
+	) or die ("\nCan't setup UDP socket on $ip$g_port: $!\n");
 	
 	print "opened OK\n";
 }
@@ -835,7 +841,10 @@ while ( ($row) = $result->fetchrow_array )
 }
 $result->finish;
 
-print "\n++ GodziBox is now running ($g_mode mode";
+&doQuery("UPDATE Matchs SET Action = 0"); # Cleaning up actions
+&doQuery("UPDATE Matchs SET ServerId = 0 WHERE Status IN (0,5,6)"); # Prevent server to stuck
+
+print "\n++ GodziBox $g_version is now running ($g_mode mode";
 if ($g_debug > 0) { print ", debug level $g_debug"; }
 print ").\n\n";
 
@@ -906,7 +915,12 @@ while ($loop = &getLine())
 			}
 			else
 			{
-				# No log from server in last 5mins. Retry !
+				if($g_servers{$s_addr}->{lastlog} + 300 < $now)
+				{
+					# No log from server in last 5mins. (Reload'n')Retry !
+					&printEvent(997, "SERVER TIMED OUT: " . $s_addr);
+					$g_servers{$s_addr}->logattach();
+				}
 			}
 		}
 		$result->finish;
@@ -917,9 +931,10 @@ while ($loop = &getLine())
         if ($lastsrvthink + 1 < $now)
         {
                 $lastsrvthink = $now;
-		foreach $server (@g_servers)
+		foreach $server (%g_servers)
 		{
-			$server->think();
+			# foreach sometimes gives boggous entries so check before use :)
+			$g_servers{$server}->think() if($g_servers{$server});
 		}
 
         }
@@ -1507,7 +1522,8 @@ while ($loop = &getLine())
 			$ev_type = 12;
 			$ev_status = &doEvent_TeamAction(
 				$ev_team,
-				$ev_obj_a
+				$ev_obj_a,
+				%ev_properties
 			);
 		}
 		elsif (like($ev_verb, "triggered a"))

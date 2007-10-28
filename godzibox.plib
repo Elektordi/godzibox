@@ -26,9 +26,9 @@
 #
 
 
-# HLstats release version number
+# GodziBox release version number
 
-$VERSION = "0.1";
+$VERSION = "0.3";
 $g_version = $VERSION;
 
 %PATTERNS = ();
@@ -341,7 +341,7 @@ sub rcon
 			Type=>$server_type
 		);
 		
-		&printNotice("Sending rcon '$command' to $server_ip:$server_port...\n");		
+		&printNotice("Sending rcon '$command' to $server_ip:$server_port...");		
 
 		my $result = $rcon->execute($command);
 		

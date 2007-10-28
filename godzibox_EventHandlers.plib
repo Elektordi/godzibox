@@ -32,7 +32,6 @@
 
 sub doEvent_Connect
 {	
-return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId, $ipAddr) = @_;
 	
 	my $desc;
@@ -57,13 +56,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 			$player->set("uniqueid", $ipAddr);
 		}
 		
-		&recordEvent(
-			"Connects", 0,
-			$player->get("playerid"),
-			$ipAddr,
-			$hostname,
-			$hostgroup
-		);
 	}
 	else
 	{
@@ -81,7 +73,7 @@ return "Useless Event !"; # Provisoire, sert réellement !
 
 sub doEvent_EnterGame
 {
-return "Useless Event !"; # Provisoire, sert réellement !
+return "Useless Event !";
 	my ($playerId) = @_;
 	
 	my $desc;
@@ -110,7 +102,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 
 sub doEvent_Disconnect
 {
-return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId) = @_;
 	
 	my $desc;
@@ -119,12 +110,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 	
 	if ($player)
 	{
-		&recordEvent(
-			"Disconnects", 0,
-			$player->get("playerid")
-		);
-		
-		$player->updateDB();
 		delete($g_players{"$s_addr/$playerId"});
 	}
 	else
@@ -178,7 +163,6 @@ sub doEvent_Suicide
 
 sub doEvent_TeamSelection
 {
-return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId, $team) = @_;
 	
 	my $desc;
@@ -188,12 +172,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 	if ($player)
 	{
 		$player->set("team", $team);
-		
-		&recordEvent(
-			"ChangeTeam", 0,
-			$player->get("playerid"),
-			$player->get("team")
-		);
 	}
 	else
 	{
@@ -210,7 +188,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 
 sub doEvent_RoleSelection
 {
-return "Useless Event !"; # Provisoire, sert réellement !
 	my ($playerId, $role) = @_;
 	
 	my $desc;
@@ -220,12 +197,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 	if ($player)
 	{
 		$player->set("role", $role);
-		
-		&recordEvent(
-			"ChangeRole", 0,
-			$player->get("playerid"),
-			$player->get("role")
-		);
 	}
 	else
 	{
@@ -242,8 +213,6 @@ return "Useless Event !"; # Provisoire, sert réellement !
 
 sub doEvent_ChangeName
 {
-	return "Useless Event !";
-	
 	my ($playerId, $newname) = @_;
 	
 	my $desc;
@@ -254,28 +223,13 @@ sub doEvent_ChangeName
 	{
 		my $name = $player->get("name");
 		
-		&recordEvent(
-			"ChangeName", 0,
-			$player->get("playerid"),
-			$name,
-			$newname
-		);
-		
 		$player->set("name", $newname);
 		
 		if ($g_mode eq "NameTrack")
 		{
 			$player->set("uniqueid", $newname);
 			
-			&recordEvent(
-				"ChangeName", 0,
-				$player->get("playerid"),
-				$name,
-				$newname
-			);
-		}
-		
-		$player->updateDB();
+		}		
 	}
 	else
 	{
@@ -525,55 +479,12 @@ sub doEvent_PlayerAction
 
 sub doEvent_TeamAction
 {
-	return "Useless Event !";
-	
-	my ($team, $action) = @_;
+	my ($team, $action, %score) = @_;
 	
 	my $desc;
-	
-	if ($g_servers{$s_addr}->{numplayers} < $g_minplayers)
-	{
-		$desc = "(IGNORED) NOTMINPLAYERS: ";
-	}
-	else
-	{
-		my $query = "
-			SELECT
-				id,
-				reward_team,
-				team,
-				LENGTH(code) AS codelength
-			FROM
-				hlstats_Actions
-			WHERE
-				game='" . $g_servers{$s_addr}->{game} . "'
-				AND (
-					code='" . &quoteSQL($g_servers{$s_addr}->{map} . "_$action") . "'
-					OR code='" . &quoteSQL($action) . "'
-				)
-				AND for_TeamActions='1'
-			ORDER BY
-				codelength DESC
-			LIMIT 1
-		";
-		my $result = &doQuery($query);
+
+	$g_servers{$s_addr}->scoring(%score);
 		
-		if ($result->rows == 1)
-		{
-			my ($actionid, $reward_team, $actionteam) = $result->fetchrow_array;
-			$result->finish;
-			
-			if ($actionteam && $reward_team != 0)
-			{
-				&rewardTeam($actionteam, $reward_team, $actionid);
-			}
-		}
-		else
-		{
-			$desc = "(IGNORED) ";
-		}
-	}
-	
 	return $desc . "Team \"$team\" triggered \"$action\"";
 }
 
@@ -584,7 +495,7 @@ sub doEvent_TeamAction
 
 sub doEvent_WorldAction
 {
-	return "Useless Event !"; # Provisoire, sert réellement !
+	return "Useless Event !";
 	
 	my ($action) = @_;
 	
@@ -643,11 +554,15 @@ sub doEvent_WorldAction
 
 sub doEvent_Chat
 {
-return "Useless Event !"; # Provisoire, sert réellement !
+
 	my ($type, $playerId, $message) = @_;
 	
 	my $player = $g_players{"$s_addr/$playerId"};
 	my $playerstr = &getPlayerInfoString($player, $playerId);
+
+	$g_servers{$s_addr}->chatcommand($message, $player);
+
+	return("Got chat message '$message' from '$playerstr'");
 	
 	if ($message =~ /^\/set ([^ ]+) (.+)$/i)
 	{
@@ -774,6 +689,10 @@ sub doEvent_LogFile
 	
 	if ($type eq "start")
 	{
+		if ($g_debug > 0)
+		{
+			print("-> Got powerup signal from $s_addr !\n");
+		}
 		return "Log file started";
 	}
 	elsif ($type eq "end")
@@ -795,16 +714,15 @@ sub doEvent_ChangeMap
 {
 	my ($type, $newmap) = @_;
 	
-	$g_servers{$s_addr}->{map} = $newmap;
-	&printNotice("Current map for server \"$s_addr\" is now \"" .
-		$g_servers{$s_addr}->{map} . "\"");
-
 	if ($type eq "loading")
 	{
+		$g_servers{$s_addr}->{map} = "-".$newmap;
 		return "Loading map \"$newmap\"";
 	}
 	elsif ($type eq "started")
 	{
+		$g_servers{$s_addr}->{map} = $newmap;
+		&printNotice("Current map for server \"$s_addr\" is now \"" . $g_servers{$s_addr}->{map} . "\"");
 		return "Started map \"$newmap\"";
 	}
 	else
@@ -820,7 +738,7 @@ sub doEvent_ChangeMap
 
 sub doEvent_Rcon
 {
-	return "Useless Event !";
+	return "Rcon Event !";
 	
 	my ($type, $command, $password, $remoteAddr) = @_;
 	
