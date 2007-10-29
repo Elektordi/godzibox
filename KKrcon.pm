@@ -279,7 +279,7 @@ sub send_rcon
 	my $tmp = pack("V", $size) .$tmp;
 	unless(defined(send($self->{"socket"},$tmp,0)))
 	{
-		die("KKrcon: send $!");
+		die("KKrcon: send $!\n");
 	}
 	return 0;
 }

@@ -48,12 +48,14 @@ no strict 'vars';
 use POSIX;
 use Getopt::Long;
 use Time::Local;
+use Time::HiRes qw(usleep);
 use IO::Socket;
 use DBI;
 use Digest::MD5;
 
 require "$opt_libdir/ConfigReaderSimple.pm";
-require "$opt_libdir/KKrcon.pm";
+require "$opt_libdir/KKrcon.pm"; # HL1
+require "$opt_libdir/TRcon.pm"; # SOURCE
 require "$opt_libdir/godzibox_Server.pm";
 require "$opt_libdir/godzibox_Player.pm";
 do "$opt_libdir/godzibox.plib";
@@ -413,7 +415,7 @@ sub getPlayerInfo
 		my $userid   = $2;
 		my $uniqueid = $3;
 		my $team     = $4;
-		
+
 		# Don't connect Mr. Console or HLTV, they should not be recorded as players!
 		return 0 if ($uniqueid eq "Console");
 		return 0 if ($uniqueid eq "HLTV");
@@ -871,6 +873,9 @@ sub getLine
 
 while ($loop = &getLine())
 {
+	# DoEvents
+	usleep(1);
+
 	if ($g_stdin)
 	{
 		$s_output = $loop;
@@ -1601,6 +1606,28 @@ while ($loop = &getLine())
 			);
 		}
 	}
+	elsif ($s_output =~ /^rcon from "([^"]+)": command "([^"]+)"(.*)$/)
+	{
+                # Prototype: rcon from "obj_c": command "obj_b"
+                # Matches:
+            # 20. a) Rcon; b) Bad Rcon
+
+                $ev_verb   = "Rcon";
+                $ev_obj_a  = ""; # password
+                $ev_obj_b  = $2; # command
+                $ev_obj_c  = $1; # ip:port
+                $ev_properties = $5;
+
+                %ev_properties = &getProperties($ev_properties);
+
+                $ev_type = 20;
+                $ev_status = &doEvent_Rcon(
+                        "OK",
+                        $ev_obj_b,
+                        $ev_obj_a,
+                        $ev_obj_c
+                );
+	}
 	elsif ($s_output =~ /^([^"\(]+) "([^"]+)"(.*)$/)
 	{
 		# Prototype: verb "obj_a"[properties]
@@ -1779,7 +1806,6 @@ EOT
 			$g_servers{$server}->{numplayers}-- if ($player->get("uniqueid") !~ /PENDING/);
 			&printNotice("NumPlayers ($server): $g_servers{$server}->{numplayers} (Auto-Disconnect)");
 			
-			$player->updateDB();
 			delete($g_players{$pl});
 		}
 	}

@@ -42,7 +42,7 @@ sub new
 	# Initialise Properties
 	$self->{userid} = 0;
 	$self->{server} = "";
-	$self->{name} = "";
+	$self->{name} = "/NONAME/";
 	$self->{uniqueid} = "";
 	
 	$self->{playerid} = 0;
@@ -63,10 +63,11 @@ sub new
 	
 	die("HLstats_Player->new(): must specify player's name\n")
 		unless ($params{name} ne "");
-	
+
 	while (my($key, $value) = each(%params))
 	{
-		if ($key ne "name" && $key ne "uniqueid")
+		#if ($key ne "name" && $key ne "uniqueid")
+		if ($key ne "uniqueid")
 		{
 			$self->set($key, $value);
 		}

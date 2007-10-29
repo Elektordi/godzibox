@@ -483,8 +483,8 @@ sub doEvent_TeamAction
 	
 	my $desc;
 
-	$g_servers{$s_addr}->scoring(%score);
-		
+	$g_servers{$s_addr}->scoring($team,$action,%score);
+	
 	return $desc . "Team \"$team\" triggered \"$action\"";
 }
 

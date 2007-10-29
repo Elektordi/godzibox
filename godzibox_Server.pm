@@ -36,11 +36,12 @@ sub new
 	my ($self) = {};
 	
 	bless($self, $class_name);
-	
+
 	$self->{id}      = $serverId;
 	$self->{address} = $address;
 	$self->{port}    = $port;
 	$self->{game}    = $game;
+	$self->{rcon_obj} = 0;
 	
 	$self->{name}	= $name;
 	$self->{map}     = "";
@@ -80,19 +81,22 @@ sub new
 	$self->{randomsides} = 0; # T1 will not always start as CT
 
 	# Find teams names
-	my $query = "SELECT IsSource, Team1, Team2, Team1Trigger, Team2Trigger FROM Games WHERE GameId = $game;";
+	my $query = "SELECT IsSource, Team1, Team2, Team1Trigger, Team2Trigger, RestartRound FROM Games WHERE GameId = $game;";
 	my $result = ::doQuery($query);
 	if (!$result->rows)
 	{
 		print("!! Unknow Game #$game \n");
 	}
-	($issource, $t1code, $t2code, $t1trig, $t2trig) = $result->fetchrow_array;
+	($issource, $t1code, $t2code, $t1trig, $t2trig, $restartround) = $result->fetchrow_array;
 
 	$self->{source} = $issource;
 	$self->{t1code} = $t1code;
 	$self->{t2code} = $t2code;
 	$self->{t1trig} = $t1trig;
 	$self->{t2trig} = $t2trig;
+	$self->{restartround} = $restartround;
+
+#	$self->init_rcon() if($issource);
 
 	return $self;
 }
@@ -102,13 +106,54 @@ sub say
 	# /!\ Max 63 caractères /!\
 
 	my ($self, $message) = @_;
-	::say($message, $self->{address}, $self->{port});
+	print("!! Message > 63 chars ($message)") if(length($message)>63);
+	::say($message, $self->{address}, $self->{port}, $self->{source});
+}
+
+sub init_rcon
+{
+	my ($self)      = @_;
+    my $server_ip   = $self->get("address");
+    my $server_port = $self->get("port");
+    my $game        = $self->get("game");
+	if ($rcon_pass)
+	{
+      		$self->{rcon_obj} = new TRcon($self);
+	}  
+   	if ($self->{rcon_obj}) 
+	{
+	 my $rcon_obj = $self->get("rcon_obj");
+         &::printEvent ("TRCON: Connecting to rcon on $server_ip:$server_port ... ok");
+	  $self->{play_game} = $rcon_obj->getServerGame();
+
+	}
 }
 
 sub rcon
 {
 	my ($self, $command) = @_;
-	::rcon($command, $self->{address}, $self->{port});
+
+	if(0) #if($self->{source})
+	{
+		my $result;
+		my $rcon_obj = $self->{rcon_obj};
+		if (($::g_stdin == 0) && ($rcon_obj) && ($self->{rcon} ne "")) {
+	 
+			# replace ; to avoid executing multiple rcon commands.
+			$command  =~ s/;//g;
+	
+			&::printNotice("RCON: $command");
+			$result = $rcon_obj->execute($command);
+		} else {
+			&::printNotice("Rcon error: No Object available");
+		}
+		return $result;
+
+	}
+	else
+	{
+		return ::rcon($command, $self->{address}, $self->{port}, $self->{source});
+	}
 }
 
 sub think
@@ -280,12 +325,9 @@ sub think
 		}
 		if($self->{lastsay}==100)
 		{
-			$self->say("Les deux équipes sont prêtes ! Match dans 30 secondes...");
-		}
-		if($self->{lastsay}==110)
-		{
+			$self->say("Les deux équipes sont prêtes ! Match dans 15 secondes...");
 			$self->say("(En disant 'stop' vous pouvez arrêter le compte à rebours !)");
-			$self->{lastsay}=190;
+			$self->{lastsay}=195;
 		}
 		if($self->{lastsay}==200)
 		{
@@ -301,12 +343,12 @@ sub think
 		if($self->{lastsay}==207) { $self->say("3..."); }
 		if($self->{lastsay}==208)
 		{
-			$self->rcon("sv_restartround 1"); # To prevent scoring when the round finished on match start
+			$self->rcon($self->{restartround}); # To prevent scoring when the round finished on match start
 			$self->say("2...");
 		}
 		if($self->{lastsay}==209)
 		{
-			$self->rcon("sv_restartround 1");
+			$self->rcon($self->{restartround});
 			$self->say("1...");
 		}
 		if($self->{lastsay}==210)
@@ -322,18 +364,26 @@ sub think
 	else
 	{
 		$self->say("Score a l'issue de la manche n°$self->{turn}:") if($self->{lastsay}==102);
-		$self->say("$self->{t1name} => $self->{t1score}") if($self->{lastsay}==104);
-		$self->say("$self->{t2name} => $self->{t2score}") if($self->{lastsay}==106);
+		if($self->{turn}==1)
+		{
+			$self->say("$self->{t1name} : $self->{t1score} points") if($self->{lastsay}==104);
+			$self->say("$self->{t2name} : $self->{t2score} points") if($self->{lastsay}==106);
+		}
+		else
+		{
+			$self->say("$self->{t2name} : $self->{t1score} points") if($self->{lastsay}==104);
+			$self->say("$self->{t1name} : $self->{t2score} points") if($self->{lastsay}==106);
+		}
 		$self->say("Les scores ont été envoyés à l'admin...") if($self->{lastsay}==108);
 		if($self->{turn}==1)
 		{
 			$self->say("Une seconde manche va avoir lieu...") if($self->{lastsay}==110);
-			$self->say("Après le rechargement de la map,") if($self->{lastsay}==112);
-			$self->say("merci de bien vouloir changer d'équipe !") if($self->{lastsay}==113);
+			$self->say("Merci de bien vouloir changer d'équipe !") if($self->{lastsay}==112);
 			$self->say("Le second warm-up va maintenant commencer...") if($self->{lastsay}==114);
 			if($self->{lastsay}==116)
 			{
-				$self->rcon("sv_restartround 1");
+				$self->rcon("exec rules/rules_$rules.cfg");
+				$self->rcon($self->{restartround});
 				$self->{turn} = 2;
 				$self->{warmup} = 1;
 				$self->{lastsay} = 0;
@@ -345,8 +395,30 @@ sub think
 		else
 		{
 			$self->say("Les deux manches sont terminées !") if($self->{lastsay}==110);
-			$self->say("Le vainqueur du match est: XXX") if($self->{lastsay}==112);
-			$self->say("Scores: 00 à 00") if($self->{lastsay}==114);
+			if($self->{lastsay}==112)
+			{
+				my $query = "SELECT Player1ScoreSet1+Player1ScoreSet2, Player2ScoreSet1+Player2ScoreSet2 FROM Matchs WHERE MatchId=$self->{matchid}";
+				my $result = ::doQuery($query);
+				($score1, $score2) = $result->fetchrow_array;
+
+				$winner = "Personne... Ex-aequo !!!";
+				$self->{t1score} = $self->{t2score} = $score1;
+
+				if($score1>$score2)
+				{
+					$winner = $self->{t1name};
+					$self->{t1score} = $score1;
+					$self->{t2score} = $score2;
+				}
+				if($score1<$score2)
+				{
+					$winner = $self->{t2name};
+					$self->{t1score} = $score2;
+					$self->{t2score} = $score1;
+				}
+				$self->say("Le vainqueur du match est: $winner")
+			}
+			$self->say("Scores: $self->{t1score} à $self->{t2score}") if($self->{lastsay}==114);
 			$self->say("Vous pouvez maintenant vous déconnecter...") if($self->{lastsay}==116);
 			$self->say("Arrêt du serveur de jeu !") if($self->{lastsay}==118);
 			if($self->{lastsay}==118)
@@ -369,7 +441,8 @@ sub think
 			# Start server
                         if($self->{step}==1 && $self->{map} eq $self->{matchmap})
                         {
-				$self->rcon("exec rules/$rules.cfg");
+				print("-> Server ready for match #$self->{matchid}\n");
+				$self->rcon("exec rules/rules_$rules.cfg");
 				$self->hostname("$t1name vs $t2name");
 				$self->status(1);
 				$self->{turn}=1;
@@ -381,7 +454,7 @@ sub think
 				$self->say("Le serveur va servir au match $t1name vs $t2name !");
 				$self->say("Réinitialisation...");
 				$self->rcon("sv_password $password");
-                                $self->rcon("map $self->{matchmap}");
+                                $self->changemap($self->{matchmap});
                                 $self->{step}=1;
 				
                         }
@@ -500,14 +573,34 @@ sub chatcommand
 sub changemap
 {
 	my ($self,$map) = @_;
-	if($self->{kickonmapload})
+	$self->kickall() if($self->{kickonmapload});
+	$self->rcon("changelevel $map");
+}
+
+sub kickall
+{
+	my ($self) = @_;
+	$desc = "Vidage serveur...";
+	$maxplayers = 32;
+	$rcon = "";
+	for ($i = 1; $i <= $maxplayers; $i++)
 	{
-		$self->rcon("map $map");
+		if(length($rcon) > 485 - length($desc))
+		{
+			$self->rcon($rcon);
+			$rcon="";
+		}
+		if($self->{source})
+		{
+			$rcon.="kickid $i $desc;";
+		}
+		else
+		{
+			$rcon.="kick #$i $desc;";
+		}
+		
 	}
-	else
-	{
-		$self->rcon("changelevel $map");
-	}
+	$self->rcon($rcon);
 }
 
 sub status
@@ -519,12 +612,48 @@ sub status
 
 sub scoring
 {
-	my ($self, %scores) = @_;
-	while (my($team, $score) = each(%scores))
+	my ($self, $team, $action, %scores) = @_;
+
+
+	return 0 if($self->{lastsay}>0);
+	return 0 if($self->{warmup});
+
+	$noscore = 1;
+	print("ACTION = $action\n");
+
+	if($action eq "round_win")
 	{
-		$self->{t1score}=$score if($team eq $self->{t1trig});
-		$self->{t2score}=$score if($team eq $self->{t2trig});
+		$s = $scores{rounds_won};
+		print("SCORE = $s\n");
+		return 0 unless($s);
+
+		$self->{t1score} = $s if($team eq $self->{t1trig});
+		$self->{t2score} = $s if($team eq $self->{t2trig});
+		$noscore = 0;
 	}
+
+	while (my($st, $score) = each(%scores))
+	{
+		next if($score+0 ne $score); # Check if number
+
+		print("ST = $st - S = $score\n");
+
+		if($st eq $self->{t1trig})
+		{
+			$self->{t1score}=$score;
+			$noscore = 0;
+		}
+		if($st eq $self->{t2trig})
+		{
+			$self->{t2score}=$score;
+			$noscore = 0;
+		}
+	}
+
+	return 0 if($noscore);
+
+	print("-> Match #$self->{matchid} score : $self->{t1score} - $self->{t2score}\n");
+
 	$set = "ScoreSet".$self->{turn};
 	if($self->{turn}==1)
 	{
@@ -535,15 +664,74 @@ sub scoring
 		::doQuery("UPDATE Matchs SET Player1$set = $self->{t2score}, Player2$set = $self->{t1score} WHERE MatchId = $self->{matchid}");
 	}
 	$self->{round} = $self->{t1score}+$self->{t2score};
-	if($self->{round} >= $self->{maxrounds})
+	$breakpoint = 0;
+
+	if($self->{breakpoint} && $self->{turn}==2)
 	{
-		$self->say("$self->{maxrounds} rounds joués. Fin de la manche.");
-		$self->{lastsay}=100;
+		my $query = "SELECT 1 FROM `Matchs` WHERE Player1ScoreSet1 + Player1ScoreSet2 > MaxRounds OR Player2ScoreSet1 + Player2ScoreSet2 > MaxRounds AND MatchID=$self->{matchid}";
+		my $result = ::doQuery($query);
+		if ($result->rows)
+		{
+			$breakpoint = 1;
+			$self->say("Une des équipes a atteint le score décisif !");
+			$self->say("Inutile de continuer le match...");
+		}
+	}
+
+	if($self->{round} >= $self->{maxrounds} || $breakpoint)
+	{
+		if($self->{turn}==2 && !$self->{allowtie} && $self->istie)
+		{
+			if(!$self->{isovertime})
+			{
+				$self->rcon("exec rules/rules_overtime_$rules.cfg");
+				$self->say("Egalité ! Prolongations...");
+				$self->say("Vous devez mener de 2 points pour gagner !");
+				$self->{isovertime}=1;
+				::doQuery("UPDATE Matchs SET MatchIsOvertime = 1 WHERE MatchId = $self->{matchid}");
+				$self->rcon($self->{restartround});
+			}
+			else
+			{
+				$self->say("$self->{round} / $self->{maxrounds} rounds joués (prolongations) !");
+			}
+
+			if($self->{t1score} > $self->{t2score} + 1)
+			{
+				$self->say("$self->{t1name} mène...");
+				$self->say("Fin des prolongations !!!");
+				$self->{lastsay}=100;
+			}
+
+			if($self->{t2score} > $self->{t1score} + 1)
+			{
+				$self->say("$self->{t2name} mène...");
+				$self->say("Fin des prolongations !!!");
+				$self->{lastsay}=100;
+			}
+		}
+		else
+		{
+			$self->say("$self->{round} / $self->{maxrounds} rounds joués. Fin de la manche.");
+			$self->{lastsay}=100;
+		}
 	}
 	else
 	{
 		$self->say("$self->{round} / $self->{maxrounds} rounds joués.");
 	}
+}
+
+sub istie
+{
+	my ($self) = @_;
+	return 1 if($self->{isovertime});
+
+	my $query = "SELECT 1 FROM `Matchs` WHERE Player1ScoreSet1 + Player1ScoreSet2 = Player2ScoreSet1 + Player2ScoreSet2 AND MatchID=$self->{matchid}";
+	my $result = ::doQuery($query);
+	return 1 if ($result->rows);
+
+	return 0;
 }
 
 sub ping
@@ -555,7 +743,14 @@ sub ping
 sub logattach
 {
 	my ($self) = @_;
-	$self->rcon("logaddress ".$::g_ip." ".$::g_port);
+	if(!$self->{source})
+	{
+		$self->rcon("logaddress ".$::g_ip." ".$::g_port);
+	}
+	else
+	{
+		$self->rcon("logaddress_add ".$::g_ip.":".$::g_port);
+	}
 	$self->rcon("log on");
 }
 
@@ -572,7 +767,8 @@ sub disconnect
 	$self->say("Disconnecting server...");
 	$self->hostname("OFFLINE");
 	$self->rcon("sv_password ".md5_base64(time()));
-	$self->rcon("map bounce");
+	$self->kickall();
+	$self->{map} = "";
 }
 
 1;

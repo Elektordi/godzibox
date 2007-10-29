@@ -28,7 +28,7 @@
 
 # GodziBox release version number
 
-$VERSION = "0.3";
+$VERSION = "1.0 RC";
 $g_version = $VERSION;
 
 %PATTERNS = ();
@@ -283,41 +283,43 @@ sub doConf
 
 
 #
-# string say (string message[, string server_ip[, string server_port]])
+# string say (string message[, string server_ip[, string server_port [, bool server_source]]])
 #
 # Say the given message via rcon.
 #
 
 sub say
 {
-	my ($message, $server_ip, $server_port) = @_;
+	my ($message, $server_ip, $server_port, $server_source) = @_;
 	
 	$server_ip   = $s_peerhost  unless ($server_ip);
 	$server_port = $s_peerport  unless ($server_port);
+	$server_source = 0  unless ($server_source);
 	
-	return &rcon("say $message", $server_ip, $server_port);
+	return &rcon("say $message", $server_ip, $server_port, $server_source);
 }
 
 #
-# string rcon (string command[, string server_ip[, string server_port]])
+# string rcon (string command[, string server_ip[, string server_port[, bool server_source]]])
 #
 # Executes the given command via Rcon.
 #
 
 sub rcon
 {
-	my ($command, $server_ip, $server_port) = @_;
+	my ($command, $server_ip, $server_port, $server_source) = @_;
 	
 	return 0  unless ($g_rcon);
 	
 	$server_ip   = $s_peerhost  unless ($server_ip);
 	$server_port = $s_peerport  unless ($server_port);
+
 	my ($server_type) = "new"; # Default to HL1 rcon
-	
+	$server_type = "source" if ($server_source);
+
 	my $result = &doQuery("
 		SELECT
-			ServerRcon,
-			ServerType
+			ServerRcon
 		FROM
 			GameServer
 		WHERE
@@ -325,14 +327,12 @@ sub rcon
 		AND
 			ServerPort='$server_port'
 	");
-	my ($password, $source) = $result->fetchrow_array();
+	my ($password) = $result->fetchrow_array();
 	$result->finish;
-	
-	$server_type = "source" if ($source);
 
 	if ($password)
 	{
-		&printNotice("Doing rcon: $server_ip:$server_port, \"$password\", \"$command\"");
+		&printNotice("Doing rcon: $server_ip:$server_port($server_type) \"$command\"");
 		my $rcon;
 		$rcon = new KKrcon(
 			Password=>$password,
@@ -352,10 +352,10 @@ sub rcon
 	}
 	else
 	{
+		&printNotice("No rcon password for $server_ip:$server_port...");
 		return "";
 	}
 }
-
 
 
 #
